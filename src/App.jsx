@@ -9,84 +9,69 @@ const CN = {G81:"81",G82:"82",G72:"72",G71:"71",G61:"61",G62:"62",D43:"D3",D44:"
 function numStyle(v, mx) {
   if (!v || mx === 0) return {color:"#888",fontSize:7,fontWeight:500};
   const r = Math.min(v / mx, 1);
-  if (r < 0.15) return {color:"#888",fontSize:7,fontWeight:500};
-  if (r < 0.3)  return {color:"#555",fontSize:8,fontWeight:600};
+  if (r < 0.15) return {color:"rgba(0,0,0,0.5)",fontSize:7,fontWeight:600};
+  if (r < 0.3)  return {color:"rgba(0,0,0,0.7)",fontSize:8,fontWeight:700};
   if (r < 0.5)  return {color:"#C62828",fontSize:9,fontWeight:700};
   if (r < 0.7)  return {color:"#B71C1C",fontSize:10,fontWeight:800};
   return                {color:"#7f0000",fontSize:11,fontWeight:900};
 }
 
-function Cell({ parts, workParts, maxVal, showWork }) {
-  if (parts.length === 0 && workParts.length === 0) {
-    return <td style={{padding:0,border:"1px solid #f0f0f0",borderRadius:1}}></td>;
+function Cell({ cranes, maxVal }) {
+  // cranes: [{crane, fault, work}]
+  if (cranes.length === 0) {
+    return <td style={{padding:0,background:"#fff",borderRadius:1}}></td>;
   }
 
-  // Work only (no faults)
-  if (parts.length === 0 && showWork) {
-    return (
-      <td title={workParts.map(w=>w.crane+": "+w.count+" ops").join(" | ")} style={{padding:0,borderRadius:2}}>
-        <div style={{height:22,display:"flex",alignItems:"center",justifyContent:"center",gap:1}}>
-          {workParts.slice(0,3).map((w,i) => (
-            <div key={i} style={{width:4,height:4,borderRadius:4,background:CL[w.crane],opacity:0.3}}/>
-          ))}
-        </div>
-      </td>
-    );
-  }
+  const tip = cranes.map(c => 
+    c.crane + " → work:" + c.work + (c.fault ? " / fault:" + c.fault : "")
+  ).join("\n");
 
-  if (parts.length === 0) {
-    return <td style={{padding:0,border:"1px solid #f0f0f0",borderRadius:1}}></td>;
-  }
-
-  // Build tooltip with both fault and work info
-  const faultTip = parts.map(p=>p.crane+": "+p.count+" faults").join(" | ");
-  const workMap = {};
-  workParts.forEach(w => { workMap[w.crane] = w.count; });
-  const workTip = parts.map(p => p.crane+": "+(workMap[p.crane]||0)+" ops").join(" | ");
-  const tip = faultTip + "\n" + workTip;
-
-  if (parts.length === 1) {
-    const p = parts[0];
-    const ns = numStyle(p.count, maxVal);
-    const wc = workMap[p.crane] || 0;
+  if (cranes.length === 1) {
+    const c = cranes[0];
+    const hasFault = c.fault > 0;
+    const ns = hasFault ? numStyle(c.fault, maxVal) : {};
     return (
       <td title={tip} style={{padding:0,position:"relative",borderRadius:2,
-        background:CL[p.crane]+"18",borderLeft:"3px solid "+CL[p.crane],
-        borderTop:"1px solid "+CL[p.crane]+"33",borderBottom:"1px solid "+CL[p.crane]+"33",
-        borderRight:"1px solid "+CL[p.crane]+"33"}}>
+        background: hasFault ? CL[c.crane]+"22" : "#fff",
+        borderLeft: hasFault ? "3px solid "+CL[c.crane] : "3px solid transparent",
+        borderTop:"1px solid "+(hasFault?CL[c.crane]+"44":"transparent"),
+        borderBottom:"1px solid "+(hasFault?CL[c.crane]+"44":"transparent"),
+        borderRight:"1px solid "+(hasFault?CL[c.crane]+"44":"transparent")}}>
         <div style={{height:22,display:"flex",alignItems:"center",justifyContent:"center"}}>
-          <span style={{...ns}}>{p.count}</span>
+          {hasFault ? (
+            <span style={{...ns}}>{c.fault}</span>
+          ) : (
+            <span style={{fontSize:5,color:CL[c.crane],opacity:0.4,fontWeight:600}}>●</span>
+          )}
         </div>
         <div style={{position:"absolute",bottom:0,right:1,fontSize:4,fontWeight:600,
-          color:CL[p.crane],lineHeight:"5px",opacity:0.5}}>{CN[p.crane]}</div>
-        {showWork && wc > 0 && (
-          <div style={{position:"absolute",bottom:0,left:0,right:0,height:2,
-            background:CL[p.crane],opacity:Math.min(wc/200,0.6)}}/>
-        )}
+          color:CL[c.crane],lineHeight:"5px",opacity:hasFault?0.5:0.3}}>{CN[c.crane]}</div>
       </td>
     );
   }
 
+  // Multiple cranes: even split
   return (
     <td title={tip} style={{padding:0}}>
-      <div style={{display:"flex",height:22,borderRadius:2,overflow:"hidden",border:"1px solid rgba(0,0,0,0.06)"}}>
-        {parts.map((p,i) => {
-          const ns = numStyle(p.count, maxVal);
-          const wc = workMap[p.crane] || 0;
+      <div style={{display:"flex",height:22,borderRadius:2,overflow:"hidden",background:"#fff"}}>
+        {cranes.map((c,i) => {
+          const hasFault = c.fault > 0;
+          const ns = hasFault ? numStyle(c.fault, maxVal) : {};
           return (
             <div key={i} style={{
-              flex:1,background:CL[p.crane]+"20",
+              flex:1,
+              background: hasFault ? CL[c.crane]+"25" : "#fff",
               display:"flex",alignItems:"center",justifyContent:"center",
-              borderRight:i<parts.length-1?"1px solid rgba(0,0,0,0.08)":"none",
+              borderRight:i<cranes.length-1?"1px solid rgba(255,255,255,0.7)":"none",
               position:"relative",
             }}>
-              <span style={{...ns}}>{p.count}</span>
-              <div style={{position:"absolute",bottom:0,right:1,fontSize:3.5,fontWeight:600,
-                color:CL[p.crane],lineHeight:"5px",opacity:0.45}}>{CN[p.crane]}</div>
-              {showWork && wc > 0 && (
-                <div style={{position:"absolute",bottom:0,left:0,right:0,height:2,
-                  background:CL[p.crane],opacity:Math.min(wc/200,0.6)}}/>
+              {hasFault ? (
+                <span style={{...ns}}>{c.fault}</span>
+              ) : (
+                <span style={{fontSize:5,color:CL[c.crane],opacity:0.35,fontWeight:600}}>●</span>
               )}
+              <div style={{position:"absolute",bottom:0,right:0,fontSize:3,fontWeight:600,
+                color:CL[c.crane],lineHeight:"4px",opacity:hasFault?0.5:0.25}}>{CN[c.crane]}</div>
             </div>
           );
         })}
@@ -95,31 +80,29 @@ function Cell({ parts, workParts, maxVal, showWork }) {
   );
 }
 
-function Grid({ bays, rows, craneHeats, workHeats, craneList, maxVal, showWork }) {
+function Grid({ bays, rows, craneHeats, workHeats, craneList, maxVal }) {
   return (
-    <table style={{width:"100%",borderCollapse:"separate",borderSpacing:"1px 2px",tableLayout:"fixed"}}>
+    <table style={{width:"100%",borderCollapse:"separate",borderSpacing:"2px 2px",tableLayout:"fixed",background:"#e0e0e0"}}>
       <thead>
-        <tr>
+        <tr style={{background:"#f5f6f8"}}>
           <th style={{width:22}}></th>
-          {bays.map(b=><th key={b} style={{fontSize:6,color:"#aaa",fontWeight:600,textAlign:"center",padding:0}}>{b}</th>)}
+          {bays.map(b=><th key={b} style={{fontSize:8,color:"#333",fontWeight:800,textAlign:"center",padding:"2px 0",background:"#f5f6f8"}}>{b}</th>)}
         </tr>
       </thead>
       <tbody>
         {rows.map(row=>(
           <tr key={row}>
-            <td style={{fontSize:8,fontWeight:800,textAlign:"center",padding:0,
-              color:row==="LS"||row==="WS"?"#1565C0":"#666"}}>{row}</td>
+            <td style={{fontSize:8,fontWeight:800,textAlign:"center",padding:0,background:"#f5f6f8",
+              color:row==="LS"||row==="WS"?"#1565C0":"#555"}}>{row}</td>
             {bays.map(b=>{
               const k=b+"|"+row;
-              const parts=[];
-              const workParts=[];
+              const cellCranes=[];
               craneList.forEach(c=>{
                 const fv=craneHeats[c]?.[k]||0;
                 const wv=workHeats[c]?.[k]||0;
-                if(fv>0) parts.push({crane:c,count:fv});
-                if(wv>0) workParts.push({crane:c,count:wv});
+                if(fv>0||wv>0) cellCranes.push({crane:c,fault:fv,work:wv});
               });
-              return <Cell key={k} parts={parts} workParts={workParts} maxVal={maxVal} showWork={showWork}/>;
+              return <Cell key={k} cranes={cellCranes} maxVal={maxVal}/>;
             })}
           </tr>
         ))}
@@ -131,12 +114,12 @@ function Grid({ bays, rows, craneHeats, workHeats, craneList, maxVal, showWork }
 export default function App() {
   const [block, setBlock] = useState("8G");
   const [week, setWeek] = useState("ALL");
-  const [showWork, setShowWork] = useState(true);
 
   const bays = D.bi[block]?.bays || [];
 
   const rows = useMemo(() => {
     const s = new Set();
+    // Include rows from both fault and work data
     D.wks.forEach(wk => {
       const h = D.wbh[wk.w+"|"+block] || {};
       Object.keys(h).forEach(k => s.add(k.split("|")[1]));
@@ -149,7 +132,6 @@ export default function App() {
     D.wks.forEach(wk => {
       Object.keys(D.wcb).filter(k => k.startsWith(wk.w+"|") && k.endsWith("|"+block))
         .forEach(k => s.add(k.split("|")[1]));
-      // Also check work data
       Object.keys(D.wk).filter(k => k.startsWith(wk.w+"|") && k.endsWith("|"+block))
         .forEach(k => s.add(k.split("|")[1]));
     });
@@ -187,7 +169,7 @@ export default function App() {
       <div style={{maxWidth:1200,margin:"0 auto"}}>
 
         <h1 style={{fontSize:16,fontWeight:800,color:"#0D2137",margin:"0 0 8px"}}>
-          IDEAL POSITION Fault + Work Activity — Block Map
+          IDEAL POSITION Fault + Work Activity
         </h1>
 
         <div style={{background:"#fff",borderRadius:10,padding:"8px 12px",marginBottom:8,
@@ -212,11 +194,6 @@ export default function App() {
               background:week===String(wk.w)?"#1565C0":"#f0f0f0",color:week===String(wk.w)?"#fff":"#555",
             }}>{wk.l}</button>
           ))}
-          <div style={{width:1,height:18,background:"#e0e0e0",margin:"0 4px"}}/>
-          <button onClick={()=>setShowWork(!showWork)} style={{
-            padding:"4px 12px",borderRadius:6,border:"none",cursor:"pointer",fontSize:10,fontWeight:600,
-            background:showWork?"#2E7D32":"#f0f0f0",color:showWork?"#fff":"#555",
-          }}>{showWork ? "Work: ON" : "Work: OFF"}</button>
         </div>
 
         <div style={{background:"#fff",borderRadius:10,padding:"6px 12px",marginBottom:8,
@@ -230,21 +207,18 @@ export default function App() {
             </div>
           ))}
           <div style={{width:1,height:14,background:"#e0e0e0",margin:"0 4px"}}/>
-          <span style={{fontSize:9,color:"#888",fontWeight:600}}>Number</span>
-          <span style={{fontSize:7,fontWeight:500,color:"#888"}}>1</span>
-          <span style={{fontSize:9,fontWeight:700,color:"#C62828"}}>5</span>
-          <span style={{fontSize:11,fontWeight:900,color:"#7f0000"}}>10+</span>
-          {showWork && (<>
-            <div style={{width:1,height:14,background:"#e0e0e0",margin:"0 4px"}}/>
-            <span style={{fontSize:8,color:"#888"}}>
-              <span style={{display:"inline-block",width:6,height:6,borderRadius:6,background:"#999",opacity:0.3,marginRight:2,verticalAlign:"middle"}}></span>
-              work only (no fault)
-            </span>
-            <span style={{fontSize:8,color:"#888"}}>
-              <span style={{display:"inline-block",width:14,height:2,background:"#1565C0",opacity:0.5,marginRight:2,verticalAlign:"middle"}}></span>
-              work bar
-            </span>
-          </>)}
+          <div style={{display:"flex",alignItems:"center",gap:4}}>
+            <div style={{width:16,height:12,borderRadius:2,background:"#1565C022",borderLeft:"3px solid #1565C0",display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <span style={{fontSize:7,fontWeight:800,color:"#B71C1C"}}>3</span>
+            </div>
+            <span style={{fontSize:8,color:"#888"}}>fault</span>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:4}}>
+            <div style={{width:16,height:12,borderRadius:2,background:"transparent",border:"1px solid #f0f0f0",display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <span style={{fontSize:5,color:"#1565C0",opacity:0.4}}>●</span>
+            </div>
+            <span style={{fontSize:8,color:"#888"}}>work only</span>
+          </div>
         </div>
 
         {weekPanels.map(wk => (
@@ -264,41 +238,10 @@ export default function App() {
             </div>
             <div style={{padding:"4px 6px 6px"}}>
               <Grid bays={bays} rows={rows} craneHeats={wk.craneHeats} workHeats={wk.workHeats}
-                craneList={craneList} maxVal={globalMax} showWork={showWork}/>
+                craneList={craneList} maxVal={globalMax}/>
             </div>
           </div>
         ))}
-
-        <div style={{background:"#fff",borderRadius:10,padding:"8px 12px",border:"1px solid #e8ecf0",
-          boxShadow:"0 1px 3px rgba(0,0,0,0.06)",fontSize:11}}>
-          <div style={{fontWeight:700,color:"#0D2137",marginBottom:6}}>Summary — {block}</div>
-          <table style={{width:"100%",borderCollapse:"collapse"}}>
-            <thead>
-              <tr style={{borderBottom:"2px solid #e0e0e0"}}>
-                <th style={{textAlign:"left",padding:"4px 6px",color:"#888",fontSize:10}}>Crane</th>
-                <th style={{width:14}}></th>
-                {D.wks.map(wk=><th key={wk.w} style={{textAlign:"center",padding:4,color:"#1565C0",fontWeight:700,fontSize:10}}>{wk.l}</th>)}
-                <th style={{textAlign:"center",padding:4,color:"#888",fontSize:10}}>Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {craneList.map((c,ci)=>{
-                const vals=D.wks.map(wk=>{const h=D.wcb[wk.w+"|"+c+"|"+block]||{};return Object.values(h).reduce((a,b)=>a+b,0)});
-                const tot=vals.reduce((a,b)=>a+b,0);
-                if(!tot) return null;
-                return (
-                  <tr key={c} style={{borderBottom:"1px solid #f0f0f0",background:ci%2?"#fafbfc":"#fff"}}>
-                    <td style={{padding:"3px 6px",fontWeight:600}}>{c}</td>
-                    <td><div style={{width:8,height:8,borderRadius:2,background:CL[c]}}/></td>
-                    {vals.map((v,i)=><td key={i} style={{textAlign:"center",padding:3,
-                      color:v?"#333":"#ddd",fontWeight:v===Math.max(...vals)?800:400}}>{v||"-"}</td>)}
-                    <td style={{textAlign:"center",padding:3,fontWeight:800}}>{tot}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
       </div>
     </div>
   );
